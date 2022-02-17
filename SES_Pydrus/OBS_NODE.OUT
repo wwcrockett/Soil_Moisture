@@ -1,0 +1,10 @@
+ ******* Program HYDRUS
+ ******* Model of Soil Moisture at SES Site                                      
+ Date:  -1. 0.    Time: -88: 8:**
+ Units: L = cm   , T = hours, M = mmol 
+
+
+
+                               Node(  5)                      Node( 25)                      Node( 45)                      Node( 75)                      Node(105)
+
+         time         h        theta    Temp         h        theta    Temp         h        theta    Temp         h        theta    Temp         h        theta    Temp   
