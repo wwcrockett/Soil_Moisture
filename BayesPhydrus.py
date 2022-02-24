@@ -7,7 +7,7 @@
 - Run module 2 to read in data to pandas dataframe 'data_array' and convert date time strings to datetime objects
 - Input desired start and end datetimes in module 3, then run to select time window of data. 
 - Module 4 contains the function phydrus that outputs the model for the given parameters
-- Module 5 contains the function phydrus_n which returns the Log_Likelihood values for the given parameters and sigmas
+- Module 5 contains the function phydrus_n which returns the LogTheta values for the given parameters
 - Module 6 executes the Bayes MCMC, iterating through and using the phydrus_n function.
 
 """
@@ -29,6 +29,7 @@ import matplotlib.dates as mdates
 import matplotlib
 import phydrus as ps
 import random
+import logging
 
 np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)   
 
@@ -200,31 +201,14 @@ def phydrus(Par):
 # Create model
     ml = ps.Model(exe_name=exe, ws_name=ws, name="SES model", description=desc, 
               mass_units="mmol", time_unit="hours", length_unit="cm")
-
     ml.__init__(exe_name=exe, ws_name=ws, name="SES model", description=desc, 
               mass_units="mmol", time_unit="hours", length_unit="cm")
-#ml = ps.Model(exe_name=exe, ws_name=ws, name="SES model", description=desc, 
-#              mass_units="mmol", time_unit="hours", length_unit="cm")
     ml.basic_info["lFlux"] = True
     ml.basic_info["lShort"] = False
-
-
-
-
-
     ml.add_atmospheric_bc(atm, hcrits=3, hcrita=50000)
-    
-
-
-    #old_stdout = sys.stdout # backup current stdout
-    #sys.stdout = open(os.devnull, "w")
-
-
     ml.add_time_info(tmax=data[-2][-1], print_array=time, dt=0.000001, dtmin= 0.000000001, dtmax=0.05)
 
-    #sys.stdout = old_stdout # reset old stdout
-    
-    # Control the soil profile depth, node count, and material divisions directly (without using HYDRUS interface)
+ # Control the soil profile depth, node count, and material divisions directly (without using HYDRUS interface)
 
     Depth = -80 #cm depth of column
     Nodes = 161 #Number of nodes in column
@@ -387,7 +371,7 @@ def phydrus_n(Par, Par_Num):
     n = Par[0]
     Ks = Par[1]
     IC = data[3][0]
-    sigma = 0.02
+    sigma = 0.01
     #Add Profile Information:
     
     ml.add_waterflow(model=0, top_bc=3, bot_bc=4,linitw = True)
@@ -482,10 +466,10 @@ def phydrus_n(Par, Par_Num):
         del x[0:2]
         
 
-    Log_Theta = [0] * Par_Num
+    Log_Theta =0
     
     for i in range(len(y)):
-        Log_Theta[p] = Log_Theta[p] + (-np.log(2*np.pi*sigma**2)-(float(data[3][i])-y[i])**2/((2*sigma**2)))
+        Log_Theta += (-np.log(2*np.pi*sigma**2)-(float(data[3][i])-y[i])**2/((2*sigma**2)))
                 
     return(Log_Theta)
 
@@ -496,22 +480,22 @@ def phydrus_n(Par, Par_Num):
 
 before = dt.datetime.now()
 
-NChain = 10   #Iteration number
+NChain = 10000   #Iteration number
 par_num = 2  #Number of parameters to search
 
 Chain = NChain* [par_num*[0]] #Initialize chain
 
 #print(Chain)
-n = 2
+n = 2.5
 Ns = NChain * [0]
 Ns[0] = n
 Kss = NChain * [0]
-ks = 7
+ks = 100
 Kss[0] = ks
 Chain[0] = [n, ks]                #Input initial parameter values
 
 Recent = tuple(Chain[0])
-Sigma_Theta = [0.2,4]           #Parameter Jump sizes/ initial distribution width
+Sigma_Theta = [1,40]           #Parameter Jump sizes/ initial distribution width
 sigma = [3,1]
 AcceptCnt = 0
 Lower_Bound = [1,1]
@@ -532,18 +516,15 @@ for n in range(1,(NChain)):
         else:
             ThetaTest[p] =  ThetaTest[p] + Sigma_Theta[p]*random.uniform(-1,1)   #Theta Test takes previous value and randomly changes one parameter
         Prior_Ratio *= Theta[p]/ThetaTest[p]
-        
-    Log_Theta_tot = 0
-    Log_ThetaTest_tot = 0
+
 
     if n == 1:
         LogTheta = phydrus_n(Theta, par_num)        #For first run, Phydrus must be run for theta and theta test
-    LogThetaTest = phydrus_n(ThetaTest, par_num)    #For all runs, Phydrus must be run for theta test 
+    LogThetaTest = phydrus_n(ThetaTest, par_num)    #For all runs, Phydrus must be run for theta test
         
-    
-    Likelihood_Ratio = np.exp(LogThetaTest-LogTheta)  
+    Likelihood_Ratio = np.exp(LogThetaTest-LogTheta)
     Alpha = min(1,Prior_Ratio * Likelihood_Ratio)
-            
+    
     if Alpha > random.random():
         Chain[n] = ThetaTest
         AcceptCnt += 1
@@ -570,16 +551,24 @@ N = np.mean(Ns)
 Ks = np.mean(Kss)
 #print('n = %s'%N)
 #print('Ks = %s'%Ks)
+after = dt.datetime.now()
 
+time = after-before
+print(time)
+RunTime = 'Run Time = %s'%time
 
 
 date_time = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
 dir_name = './save/BayesFit_Run_'+date_time
 os.mkdir(dir_name)
-
+text = AccptRt +'\n' + n_mean +'\n' + ks_mean +'\n' + RunTime +'\n'
+text += 'Number of Iterations = %s \n'%NChain+'Initial Conditions = %s'%Chain[0]+'\n Sigmas = %s'%Sigma_Theta
 summary_file = open(dir_name+'/bayes_results.txt','w')
-summary_file.write(AccptRt +'\n' + n_mean +'\n' + ks_mean +'\n' + str(Chain))
+summary_file.write(text)
 summary_file.close()
+string_file = open(dir_name+'/bayes_chain.txt','w')
+string_file.write(str(Chain))
+string_file.close()
 
 fig1, axs = plt.subplots(nrows=2, ncols=2, figsize=(10, 10))
 axs[0, 0].set_title("n Histogram")
@@ -637,7 +626,7 @@ ax1 = fig2.add_subplot(gs[3, 0]) # first row, second col
 [T,Y] = phydrus([N,Ks])
 Ydat = data[3]
 Tdat = data[0]
-dep_2  =ax0.plot(Tdat,Ydat,color='b',marker = '+',markersize=1,label='SES 2cm')
+dep_2 = ax0.plot(Tdat,Ydat,color='b',marker = '+',markersize=1,label='SES 2cm')
 ax0.plot(T,Y,color='r',label='Phydrus Best Fit')
 ax0.legend(loc='upper left',bbox_to_anchor=(1, 1),fontsize='x-small')
 ax0.set_title('SES 2cm Soil Moisture Phydrus Best Fit')
@@ -647,16 +636,7 @@ ax1.plot(window['TIMESTAMP_START'],window['P'],color='xkcd:black',markersize=1)
 ax0.set_ylabel('SWC [%]',fontsize='x-small')
 ax1.set_ylabel('Precip '+'[mm]',fontsize='x-small')
 
-fig2.tight_layout()
 plt.savefig(dir_name+'/Best_Fit.png', bbox_inches='tight')
 plt.show()
-
-
-
-
-after = dt.datetime.now()
-
-time = after-before
-print(time)
     
 
