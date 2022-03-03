@@ -503,11 +503,11 @@ date_time = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
 dir_name = './save/GridSearch_Run_'+date_time
 os.mkdir(dir_name)
 string_file = open(dir_name+'/sum.txt','w')
-
-storageFrame = pd.DataFrame(Residuals)
-storageFrame.to_csv(dir_name+'/residuals.txt')
 string_file.write('parameters = n, Ks \n'+'Grid: 100x100 \n')
 string_file.close()
+storageFrame.to_csv(dir_name+'/residuals.txt')
+
+
 zmin = storageFrame.min().min()
 zmax = storageFrame.max().max()
 levels = np.linspace(zmin,zmax,30)
@@ -522,5 +522,4 @@ cbar = fig1.colorbar(CS, ticks = ticks,label = 'LogTheta Value')
 ax.set_xlabel('n')
 ax.set_ylabel('Ks')
 fig1.tight_layout()
-fig1.show()
-
+plt.savefig(dir_name+'/GridSearch.png', bbox_inches='tight')
