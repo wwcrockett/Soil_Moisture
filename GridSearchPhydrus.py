@@ -483,10 +483,14 @@ NChain = 100
 Ns = np.linspace(1,5,100)
 Kss = np.linspace(5,200,100)
 Residuals = np.zeros((NChain,NChain))
-for NN in range(100):
-    for KK in range(100): 
-        LogTheta = phydrus_n(n=Ns[NN],Ks=[KK])        #For first run, Phydrus must be run for theta and theta test
-        Residuals[NN,KK] = LogTheta
+storageFrame = pd.DataFrame(columns=Ns,index=Kss)
+
+for NN in Ns:
+    for KK in Kss: 
+        LogTheta = phydrus_n(n=NN,Ks=KK)        #For first run, Phydrus must be run for theta and theta test
+        print(NN)
+        print(KK)
+        storageFrame.loc[KK,NN]=LogTheta
 
 after = dt.datetime.now()
 
@@ -496,81 +500,27 @@ RunTime = 'Run Time = %s'%time
 
 
 date_time = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-dir_name = './save/BayesFit_Run_'+date_time
+dir_name = './save/GridSearch_Run_'+date_time
 os.mkdir(dir_name)
-#string_file = open(dir_name+'/bayes_chain.txt','w')
+string_file = open(dir_name+'/sum.txt','w')
+
 storageFrame = pd.DataFrame(Residuals)
 storageFrame.to_csv(dir_name+'/residuals.txt')
-#tring_file.write('Chain:\n'+ str(Chain)+'Alphas:\n'+str(Likelihoods))
-#string_file.close()
-
-fig1, axs = plt.subplots(nrows=2, ncols=2, figsize=(10, 10))
-axs[0, 0].set_title("n Histogram")
-axs[0, 0].hist(Ns, bins = 50, color='C0')
-axs[0, 0].set_ylabel("Number")
+string_file.write('parameters = n, Ks \n'+'Grid: 100x100 \n')
+string_file.close()
+zmin = storageFrame.min().min()
+zmax = storageFrame.max().max()
+levels = np.linspace(zmin,zmax,30)
 
 
-axs[1, 0].set_title('Ks[100:] Histogram')
-axs[1, 0].hist(Kss, bins = 50, color='C2')
-axs[1, 0].set_ylabel('Number')
-
-
-
-
-axs[0, 1].set_title('n Iterations')
-axs[0, 1].plot(Ns, color = 'C0')
-axs[0, 1].set_ylabel('n')
-axs[0, 1].set_xlabel('Iteration #')
-
-Tdat = data[0]
-
-axs[1, 1].set_title('Ks Iterations')
-axs[1, 1].plot(Kss, color = 'C2')
-axs[1, 1].set_ylabel('Ks')
-axs[1, 1].set_xlabel('Iteration #')
-
-
+fig1, ax = plt.subplots()
+ticks = np.linspace(zmin, zmax, 8)
+n = storageFrame.columns
+ks = storageFrame.index
+CS = ax.contourf(n,ks,storageFrame, levels=levels)
+cbar = fig1.colorbar(CS, ticks = ticks,label = 'LogTheta Value')
+ax.set_xlabel('n')
+ax.set_ylabel('Ks')
 fig1.tight_layout()
-
-plt.savefig(dir_name+'/Par_Sum.png', bbox_inches='tight')
-plt.show()
-
-fig3 = plt.figure()
-ax3 = fig3.add_subplot()
-  
-ax3.set_title('Parameter Space')
-ax3.set_ylabel('Ks')
-ax3.set_xlabel('n')
-
-x = np.linspace(-1,1,NChain)
-c = np.tan(x)
-im = ax3.scatter(Ns, Kss, c = c, marker = '.')
-cbar = plt.colorbar(im)
-cbar.set_label('Iteration #')
-               
-plt.savefig(dir_name+'/Par_Map.png', bbox_inches='tight')
-plt.show()
-
-fig2 = plt.figure()
-gs = matplotlib.gridspec.GridSpec(4, 1, wspace=0.25, hspace=0.25) # 2x2 grid
-ax0 = fig2.add_subplot(gs[0:3, 0]) # first row, first col
-ax1 = fig2.add_subplot(gs[3, 0]) # first row, second col
-
-
-[T,Y] = phydrus([N,Ks])
-Ydat = data[3]
-Tdat = data[0]
-dep_2 = ax0.plot(Tdat,Ydat,color='b',marker = '+',markersize=1,label='SES 2cm')
-ax0.plot(T,Y,color='r',label='Phydrus Best Fit')
-ax0.legend(loc='upper left',bbox_to_anchor=(1, 1),fontsize='x-small')
-ax0.set_title('SES 2cm Soil Moisture Phydrus Best Fit')
-plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y'))
-plt.gcf().autofmt_xdate()
-ax1.plot(window['TIMESTAMP_START'],window['P'],color='xkcd:black',markersize=1)
-ax0.set_ylabel('SWC [%]',fontsize='x-small')
-ax1.set_ylabel('Precip '+'[mm]',fontsize='x-small')
-
-plt.savefig(dir_name+'/Best_Fit.png', bbox_inches='tight')
-plt.show()
-    
+fig1.show()
 
