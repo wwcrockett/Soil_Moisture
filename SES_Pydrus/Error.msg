@@ -1,1 +1,0 @@
- Initial water content condition is lower than Qr !                                                                                                                                                                                                                  

@@ -183,146 +183,6 @@ data[-2][0] = 0.001
 
 time = data[-2]
 
-
-# In[4]:
-
-
-
-def phydrus(Par):
-    
-# Create Phydrus Model:
-
-# Folder for Hydrus files to be stored
-    ws = "SES_Pydrus"
-# Path to folder containing hydrus.exe 
-    exe = "./read/hydrus"  
-# Description
-    desc = "Model of Soil Moisture at SES Site"
-# Create model
-    ml = ps.Model(exe_name=exe, ws_name=ws, name="SES model", description=desc, 
-              mass_units="mmol", time_unit="hours", length_unit="cm")
-    ml.__init__(exe_name=exe, ws_name=ws, name="SES model", description=desc, 
-              mass_units="mmol", time_unit="hours", length_unit="cm")
-    ml.basic_info["lFlux"] = True
-    ml.basic_info["lShort"] = False
-    ml.add_atmospheric_bc(atm, hcrits=3, hcrita=50000)
-    ml.add_time_info(tmax=data[-2][-1], print_array=time, dt=0.000001, dtmin= 0.000000001, dtmax=0.05)
-
- # Control the soil profile depth, node count, and material divisions directly (without using HYDRUS interface)
-
-    Depth = -80 #cm depth of column
-    Nodes = 161 #Number of nodes in column
-    Mat_num = 1
-
-#--- Boundaries ---
-
-
-#--- Initial Conditions ---
-
-    Qr = 0.03398
-    Qs = 0.7
-    Alpha = 0.07
-    n = Par[0]
-    Ks = Par[1]
-    IC = data[3][0]
-
-    #Add Profile Information:
-    
-    ml.add_waterflow(model=0, top_bc=3, bot_bc=4,linitw = True)
-    m = ml.get_empty_material_df(n=Mat_num)
-    m.loc[[1]] = [[Qr,Qs,Alpha, n, Ks, 0.5]]
-    ml.add_material(m)
-
-    # Create Profile
-    profile = ps.create_profile(bot=Depth, dx=abs(Depth / (Nodes-1)))
-    ml.add_profile(profile)  # Add the profile
-    ml.add_obs_nodes([-2,-12,-22,-37,-52])
-
-    ml.write_input()
-
-
-
-
-
-#Write PROFILE.DAT    
-    prof_path = Path('./read/PROFILE.DAT')
-    prof_str = prof_path.read_text()
-    prof_lines=prof_str.split('\n')
-    prof_lines[4]= prof_lines[4][0:2]+str(Nodes)+prof_lines[4][5:]
-    del prof_lines[5:]
-    end_of_str = '    1  0.000000e+000  1.000000e+000  1.000000e+000  1.000000e+000              '
-
-    for N in range(Nodes):
-        D = N * Depth/(Nodes-1)
-        M = str(1)
-        if N == 0:
-            new_line = ' '*(5-len(str(N+1))) + str(N+1)+' -'+np.format_float_scientific(D, unique = False, precision = 6, exp_digits=3)                    + ' '+np.format_float_scientific(IC, unique = False, precision = 6, exp_digits=3)+ '    ' + M + end_of_str
-        else:
-            new_line = ' '*(5-len(str(N+1))) + str(N+1)+' '+np.format_float_scientific(D, unique = False, precision = 6, exp_digits=3)                    + ' '+np.format_float_scientific(IC, unique = False, precision = 6, exp_digits=3)+ '    ' + M + end_of_str
-        prof_lines.append(new_line)
-    
-    prof_lines.append('    0\n')
-    prof_str = '\n'.join(prof_lines)
-    
-    prof = open('./write/PROFILE.DAT','w')
-    prof.write(prof_str)
-    prof.close()
-    
-    
-#-----------------Run Model----------------
-
-    ml.simulate()
-
-#---------------Read Output----------------
-
-    
-#Each output file will be named according to the workspace from which it was generated.    
-    infile  = './write/NOD_INF.OUT'
-    outdata = []
-    ttdata   = []
-    with open(infile, 'r') as f:   # Hydrus data files are a mess.
-            raw = f.readlines()
-
-    for line in raw[6:]:
-        if "Time:"in line:
-            ttdata.append(re.split('\s+', line))
-        if len(line) > 111:
-            outdata.append(re.split('\s+', line)) # Data are whitespace delimited.
-
-    df = pd.DataFrame(ttdata)
-    tdata = df.to_numpy()
-
-    df = pd.DataFrame(outdata)
-    data_h = df.to_numpy()
-    
-    window_start=data_array[data_array['TIMESTAMP_START']>=start]
-    window=window_start[window_start['TIMESTAMP_START']<=end]
-       
-    nod     = pd.to_numeric(data_h[:,1], errors='coerce')
-    dep     = pd.to_numeric(data_h[:,2], errors='coerce') 
-    head    = pd.to_numeric(data_h[:,3], errors='coerce') 
-    mois    = pd.to_numeric(data_h[:,4], errors='coerce') 
-    times   = pd.to_numeric(tdata[:,2], errors='coerce')
-
-
-
-    print(dep)
-
-    PYDRUS_TS = []
-    for z in [-2.]:
-        mask = (dep == z)
-        y = mois[mask]
-        x=[]
-        for t in times:
-            x.append(start+dt.timedelta(hours=t))
-
-        if z == -2.:
-            PYDRUS_TS.append(x)
-        PYDRUS_TS.append(y)
-
-    print([x,y])
-    return([x,y])
-
 # In[5]:
 
 
@@ -410,7 +270,7 @@ def phydrus_n(n=2.9,Ks=25,Qs=0.7,Alpha=0.07):
     prof_lines.append('    0\n')
     prof_str = '\n'.join(prof_lines)
     
-    prof = open('./write/PROFILE.DAT','w')
+    prof = open('./SES_Pydrus/PROFILE.DAT','w')
     prof.write(prof_str)
     prof.close()
     
@@ -422,7 +282,7 @@ def phydrus_n(n=2.9,Ks=25,Qs=0.7,Alpha=0.07):
 #---------------Read Output----------------
 
     #Each output file will be named according to the workspace from which it was generated.    
-    infile  = './write/NOD_INF.OUT'
+    infile  = './SES_Pydrus/NOD_INF.OUT'
     outdata = []
     ttdata   = []
     with open(infile, 'r') as f:   # Hydrus data files are a mess.
@@ -464,7 +324,7 @@ def phydrus_n(n=2.9,Ks=25,Qs=0.7,Alpha=0.07):
         del y[0:2]
         del x[0:2]
     if dat_len > mod_len:
-        return(0)
+        return([dat_len,mod_len])
 
     Log_Theta =0
     for i in range(len(y)):
@@ -616,27 +476,4 @@ cbar.set_label('Iteration #')
                
 plt.savefig(dir_name+'/Par_Map.png', bbox_inches='tight')
 plt.show()
-
-fig2 = plt.figure()
-gs = matplotlib.gridspec.GridSpec(4, 1, wspace=0.25, hspace=0.25) # 2x2 grid
-ax0 = fig2.add_subplot(gs[0:3, 0]) # first row, first col
-ax1 = fig2.add_subplot(gs[3, 0]) # first row, second col
-
-
-[T,Y] = phydrus([N,Ks])
-Ydat = data[3]
-Tdat = data[0]
-dep_2 = ax0.plot(Tdat,Ydat,color='b',marker = '+',markersize=1,label='SES 2cm')
-ax0.plot(T,Y,color='r',label='Phydrus Best Fit')
-ax0.legend(loc='upper left',bbox_to_anchor=(1, 1),fontsize='x-small')
-ax0.set_title('SES 2cm Soil Moisture Phydrus Best Fit')
-plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y'))
-plt.gcf().autofmt_xdate()
-ax1.plot(window['TIMESTAMP_START'],window['P'],color='xkcd:black',markersize=1)
-ax0.set_ylabel('SWC [%]',fontsize='x-small')
-ax1.set_ylabel('Precip '+'[mm]',fontsize='x-small')
-
-plt.savefig(dir_name+'/Best_Fit.png', bbox_inches='tight')
-plt.show()
-    
 

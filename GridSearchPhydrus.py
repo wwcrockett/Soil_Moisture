@@ -183,146 +183,6 @@ data[-2][0] = 0.001
 
 time = data[-2]
 
-
-# In[4]:
-
-
-
-def phydrus(Par):
-    
-# Create Phydrus Model:
-
-# Folder for Hydrus files to be stored
-    ws = "SES_Pydrus"
-# Path to folder containing hydrus.exe 
-    exe = "./read/hydrus"  
-# Description
-    desc = "Model of Soil Moisture at SES Site"
-# Create model
-    ml = ps.Model(exe_name=exe, ws_name=ws, name="SES model", description=desc, 
-              mass_units="mmol", time_unit="hours", length_unit="cm")
-    ml.__init__(exe_name=exe, ws_name=ws, name="SES model", description=desc, 
-              mass_units="mmol", time_unit="hours", length_unit="cm")
-    ml.basic_info["lFlux"] = True
-    ml.basic_info["lShort"] = False
-    ml.add_atmospheric_bc(atm, hcrits=3, hcrita=50000)
-    ml.add_time_info(tmax=data[-2][-1], print_array=time, dt=0.000001, dtmin= 0.000000001, dtmax=0.05)
-
- # Control the soil profile depth, node count, and material divisions directly (without using HYDRUS interface)
-
-    Depth = -80 #cm depth of column
-    Nodes = 161 #Number of nodes in column
-    Mat_num = 1
-
-#--- Boundaries ---
-
-
-#--- Initial Conditions ---
-
-    Qr = 0.03398
-    Qs = 0.7
-    Alpha = 0.07
-    n = Par[0]
-    Ks = Par[1]
-    IC = data[3][0]
-
-    #Add Profile Information:
-    
-    ml.add_waterflow(model=0, top_bc=3, bot_bc=4,linitw = True)
-    m = ml.get_empty_material_df(n=Mat_num)
-    m.loc[[1]] = [[Qr,Qs,Alpha, n, Ks, 0.5]]
-    ml.add_material(m)
-
-    # Create Profile
-    profile = ps.create_profile(bot=Depth, dx=abs(Depth / (Nodes-1)))
-    ml.add_profile(profile)  # Add the profile
-    ml.add_obs_nodes([-2,-12,-22,-37,-52])
-
-    ml.write_input()
-
-
-
-
-
-#Write PROFILE.DAT    
-    prof_path = Path('./read/PROFILE.DAT')
-    prof_str = prof_path.read_text()
-    prof_lines=prof_str.split('\n')
-    prof_lines[4]= prof_lines[4][0:2]+str(Nodes)+prof_lines[4][5:]
-    del prof_lines[5:]
-    end_of_str = '    1  0.000000e+000  1.000000e+000  1.000000e+000  1.000000e+000              '
-
-    for N in range(Nodes):
-        D = N * Depth/(Nodes-1)
-        M = str(1)
-        if N == 0:
-            new_line = ' '*(5-len(str(N+1))) + str(N+1)+' -'+np.format_float_scientific(D, unique = False, precision = 6, exp_digits=3)                    + ' '+np.format_float_scientific(IC, unique = False, precision = 6, exp_digits=3)+ '    ' + M + end_of_str
-        else:
-            new_line = ' '*(5-len(str(N+1))) + str(N+1)+' '+np.format_float_scientific(D, unique = False, precision = 6, exp_digits=3)                    + ' '+np.format_float_scientific(IC, unique = False, precision = 6, exp_digits=3)+ '    ' + M + end_of_str
-        prof_lines.append(new_line)
-    
-    prof_lines.append('    0\n')
-    prof_str = '\n'.join(prof_lines)
-    
-    prof = open('./write/PROFILE.DAT','w')
-    prof.write(prof_str)
-    prof.close()
-    
-    
-#-----------------Run Model----------------
-
-    ml.simulate()
-
-#---------------Read Output----------------
-
-    
-#Each output file will be named according to the workspace from which it was generated.    
-    infile  = './write/NOD_INF.OUT'
-    outdata = []
-    ttdata   = []
-    with open(infile, 'r') as f:   # Hydrus data files are a mess.
-            raw = f.readlines()
-
-    for line in raw[6:]:
-        if "Time:"in line:
-            ttdata.append(re.split('\s+', line))
-        if len(line) > 111:
-            outdata.append(re.split('\s+', line)) # Data are whitespace delimited.
-
-    df = pd.DataFrame(ttdata)
-    tdata = df.to_numpy()
-
-    df = pd.DataFrame(outdata)
-    data_h = df.to_numpy()
-    
-    window_start=data_array[data_array['TIMESTAMP_START']>=start]
-    window=window_start[window_start['TIMESTAMP_START']<=end]
-       
-    nod     = pd.to_numeric(data_h[:,1], errors='coerce')
-    dep     = pd.to_numeric(data_h[:,2], errors='coerce') 
-    head    = pd.to_numeric(data_h[:,3], errors='coerce') 
-    mois    = pd.to_numeric(data_h[:,4], errors='coerce') 
-    times   = pd.to_numeric(tdata[:,2], errors='coerce')
-
-
-
-    print(dep)
-
-    PYDRUS_TS = []
-    for z in [-2.]:
-        mask = (dep == z)
-        y = mois[mask]
-        x=[]
-        for t in times:
-            x.append(start+dt.timedelta(hours=t))
-
-        if z == -2.:
-            PYDRUS_TS.append(x)
-        PYDRUS_TS.append(y)
-
-    print([x,y])
-    return([x,y])
-
 # In[5]:
 
 
@@ -334,7 +194,7 @@ def phydrus(Par):
 
 
 
-def phydrus_n(n=2.9,Ks=25,Qs=0.7,Alpha=0.07):
+def phydrus_calc(n=2.9,Ks=25,Qs=0.7,Alpha=0.07):
     
 # Create Phydrus Model:
 
@@ -410,7 +270,7 @@ def phydrus_n(n=2.9,Ks=25,Qs=0.7,Alpha=0.07):
     prof_lines.append('    0\n')
     prof_str = '\n'.join(prof_lines)
     
-    prof = open('./write/PROFILE.DAT','w')
+    prof = open('./SES_Pydrus/PROFILE.DAT','w')
     prof.write(prof_str)
     prof.close()
     
@@ -422,7 +282,7 @@ def phydrus_n(n=2.9,Ks=25,Qs=0.7,Alpha=0.07):
 #---------------Read Output----------------
 
     #Each output file will be named according to the workspace from which it was generated.    
-    infile  = './write/NOD_INF.OUT'
+    infile  = './SES_Pydrus/NOD_INF.OUT'
     outdata = []
     ttdata   = []
     with open(infile, 'r') as f:   # Hydrus data files are a mess.
@@ -439,7 +299,7 @@ def phydrus_n(n=2.9,Ks=25,Qs=0.7,Alpha=0.07):
 
     df = pd.DataFrame(outdata)
     data_h = df.to_numpy()
-
+    
     
     nod     = pd.to_numeric(data_h[:,1], errors='coerce')
     dep     = pd.to_numeric(data_h[:,2], errors='coerce') 
@@ -464,14 +324,13 @@ def phydrus_n(n=2.9,Ks=25,Qs=0.7,Alpha=0.07):
         del y[0:2]
         del x[0:2]
     if dat_len > mod_len:
-        return(0)
+        return
 
     Log_Theta =0
     for i in range(len(y)):
         Log_Theta += (-np.log(2*np.pi*sigma**2)-(float(data[3][i])-y[i])**2/((2*sigma**2)))
 
     return(Log_Theta)
-
 
 # In[ ]:
 
@@ -480,16 +339,18 @@ def phydrus_n(n=2.9,Ks=25,Qs=0.7,Alpha=0.07):
 before = dt.datetime.now()
 
 NChain = 100
-Ns = np.linspace(1,5,100)
-Kss = np.linspace(5,200,100)
+Ns = np.linspace(1,5,NChain)
+Kss = np.linspace(5,200,NChain)
 Residuals = np.zeros((NChain,NChain))
 storageFrame = pd.DataFrame(columns=Ns,index=Kss)
 
 for NN in Ns:
     for KK in Kss: 
-        LogTheta = phydrus_n(n=NN,Ks=KK)        #For first run, Phydrus must be run for theta and theta test
+        LogTheta = phydrus_calc(n=NN,Ks=KK)        #For first run, Phydrus must be run for theta and theta test
         print(NN)
         print(KK)
+        print(LogTheta)
+        #print(sumdi)
         storageFrame.loc[KK,NN]=LogTheta
 
 after = dt.datetime.now()
@@ -508,17 +369,17 @@ string_file.close()
 storageFrame.to_csv(dir_name+'/residuals.txt')
 
 
-zmin = storageFrame.min().min()
-zmax = storageFrame.max().max()
-levels = np.linspace(zmin,zmax,30)
+#zmin = storageFrame.min().min()
+#zmax = storageFrame.max().max()
+#levels = np.linspace(zmin,zmax,30)
 
 
 fig1, ax = plt.subplots()
-ticks = np.linspace(zmin, zmax, 8)
+#ticks = np.linspace(zmin, zmax, 8)
 n = storageFrame.columns
 ks = storageFrame.index
-CS = ax.contourf(n,ks,storageFrame, levels=levels)
-cbar = fig1.colorbar(CS, ticks = ticks,label = 'LogTheta Value')
+CS = ax.contourf(n,ks,storageFrame)#, levels=levels)
+cbar = fig1.colorbar(CS,label = 'LogTheta Value')
 ax.set_xlabel('n')
 ax.set_ylabel('Ks')
 fig1.tight_layout()
