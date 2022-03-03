@@ -479,78 +479,15 @@ def phydrus_n(n=2.9,Ks=25,Qs=0.7,Alpha=0.07):
 
 before = dt.datetime.now()
 
-NChain = 10000   #Iteration number
-par_num = 2  #Number of parameters to search
+NChain = 100
+Ns = np.linspace(1,5,100)
+Kss = np.linspace(5,200,100)
+Residuals = np.zeros((NChain,NChain))
+for NN in range(100):
+    for KK in range(100): 
+        LogTheta = phydrus_n(n=Ns[NN],Ks=[KK])        #For first run, Phydrus must be run for theta and theta test
+        Residuals[NN,KK] = LogTheta
 
-Chain = NChain* [par_num*[0]] #Initialize chain
-
-#print(Chain)
-n = 2.5
-Ns = NChain * [0]
-Likelihoods = NChain *[0]
-Ns[0] = n
-Kss = NChain * [0]
-ks = 100
-Kss[0] = ks
-Chain[0] = [n, ks]                #Input initial parameter values
-
-Recent = tuple(Chain[0])
-Sigma_Theta = [0.2,4]           #Parameter Jump sizes/ initial distribution width
-sigma = [3,1]
-AcceptCnt = 0
-Lower_Bound = [1,1]
-Upper_Bound = [5,200]
-
-for n in range(1,(NChain)):
-    
-    print('Iteration: %s' %n)
-    Theta = Chain[n-1]
-    ThetaTest= list(Recent)
-    Prior_Ratio = 1
-    
-    for p in range(par_num):
-        if (Theta[p]-Sigma_Theta[p])<Lower_Bound[p]:
-            ThetaTest[p] =  ThetaTest[p] + Sigma_Theta[p]*random.uniform(0,1)
-        elif (Theta[p]+Sigma_Theta[p])>Upper_Bound[p]:
-            ThetaTest[p] =  ThetaTest[p] + Sigma_Theta[p]*random.uniform(-1,0)
-        else:
-            ThetaTest[p] =  ThetaTest[p] + Sigma_Theta[p]*random.uniform(-1,1)   #Theta Test takes previous value and randomly changes one parameter
-        Prior_Ratio *= Theta[p]/ThetaTest[p]
-
-
-    if n == 1:
-        LogTheta = phydrus_n(n=Theta[0], Ks=Theta[1])        #For first run, Phydrus must be run for theta and theta test
-    LogThetaTest = phydrus_n(n=ThetaTest[0], Ks=ThetaTest[1])    #For all runs, Phydrus must be run for theta test
-        
-    Likelihood_Ratio = np.exp(LogThetaTest-LogTheta)
-    Alpha = min(1,Prior_Ratio * Likelihood_Ratio)
-    Likelihoods[n] = Alpha
-    if Alpha > random.random():
-        Chain[n] = ThetaTest
-        AcceptCnt += 1
-        LogTheta = LogThetaTest
-    else:
-        Chain[n] = Theta
-            
-    Recent = tuple(Chain[n])
-    Ns[n] = Chain[n][0]
-    Kss[n] = Chain[n][1]
-    
-AcceptRate = AcceptCnt/NChain 
-AccptRt = 'Acceptance Rate: %s'%AcceptRate
-print(AccptRt)
-
-n = np.mean(Ns[50:])
-ks = np.mean(Kss[50:])
-n_mean = 'n = %s'%n
-print(n_mean)
-ks_mean = 'ks = %s'%ks
-print(ks_mean)
-
-N = np.mean(Ns)
-Ks = np.mean(Kss)
-#print('n = %s'%N)
-#print('Ks = %s'%Ks)
 after = dt.datetime.now()
 
 time = after-before
@@ -561,14 +498,11 @@ RunTime = 'Run Time = %s'%time
 date_time = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
 dir_name = './save/BayesFit_Run_'+date_time
 os.mkdir(dir_name)
-text = AccptRt +'\n' + n_mean +'\n' + ks_mean +'\n' + RunTime +'\n'
-text += 'Number of Iterations = %s \n'%NChain+'Initial Conditions = %s'%Chain[0]+'\n Sigmas = %s'%Sigma_Theta
-summary_file = open(dir_name+'/bayes_results.txt','w')
-summary_file.write(text)
-summary_file.close()
-string_file = open(dir_name+'/bayes_chain.txt','w')
-string_file.write('Chain:\n'+ str(Chain)+'Alphas:\n'+str(Likelihoods))
-string_file.close()
+#string_file = open(dir_name+'/bayes_chain.txt','w')
+storageFrame = pd.DataFrame(Residuals)
+storageFrame.to_csv(dir_name+'/residuals.txt')
+#tring_file.write('Chain:\n'+ str(Chain)+'Alphas:\n'+str(Likelihoods))
+#string_file.close()
 
 fig1, axs = plt.subplots(nrows=2, ncols=2, figsize=(10, 10))
 axs[0, 0].set_title("n Histogram")

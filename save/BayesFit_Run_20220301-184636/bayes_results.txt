@@ -1,0 +1,7 @@
+Acceptance Rate: 0.8345
+n = 2.7471884028467524
+ks = 67.17888640802738
+Run Time = 2:14:05.651413
+Number of Iterations = 10000 
+Initial Conditions = [2.5, 100]
+ Sigmas = [1, 20]
