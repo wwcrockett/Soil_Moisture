@@ -299,7 +299,8 @@ def phydrus_calc(n=2.9,Ks=25,Qs=0.7,Alpha=0.07):
 
     df = pd.DataFrame(outdata)
     data_h = df.to_numpy()
-    
+    if df.empty:
+        return
     
     nod     = pd.to_numeric(data_h[:,1], errors='coerce')
     dep     = pd.to_numeric(data_h[:,2], errors='coerce') 
@@ -326,9 +327,9 @@ def phydrus_calc(n=2.9,Ks=25,Qs=0.7,Alpha=0.07):
     if dat_len > mod_len:
         return
 
-    Log_Theta =0
+    Log_Theta =[]
     for i in range(len(y)):
-        Log_Theta += (-np.log(2*np.pi*sigma**2)-(float(data[3][i])-y[i])**2/((2*sigma**2)))
+        Log_Theta.append(-0.5*np.log(2*np.pi*sigma**2)-(float(data[3][i])-y[i])**2/((2*sigma**2)))
 
     return(Log_Theta)
 
@@ -338,11 +339,17 @@ def phydrus_calc(n=2.9,Ks=25,Qs=0.7,Alpha=0.07):
 
 before = dt.datetime.now()
 
-NChain = 100
+NChain = 1
 Ns = np.linspace(1,5,NChain)
 Kss = np.linspace(5,200,NChain)
 Residuals = np.zeros((NChain,NChain))
 storageFrame = pd.DataFrame(columns=Ns,index=Kss)
+date_time = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+dir_name = './save/GridSearch_Run_'+date_time
+os.mkdir(dir_name)
+string_file = open(dir_name+'/sum.txt','w')
+string_file.write('parameters = n, Ks \n'+'Grid: 100x100 \n')
+string_file.close()
 
 for NN in Ns:
     for KK in Kss: 
@@ -352,22 +359,13 @@ for NN in Ns:
         print(LogTheta)
         #print(sumdi)
         storageFrame.loc[KK,NN]=LogTheta
+        storageFrame.to_csv(dir_name+'/residuals.csv')
 
 after = dt.datetime.now()
 
 time = after-before
 print(time)
 RunTime = 'Run Time = %s'%time
-
-
-date_time = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-dir_name = './save/GridSearch_Run_'+date_time
-os.mkdir(dir_name)
-string_file = open(dir_name+'/sum.txt','w')
-string_file.write('parameters = n, Ks \n'+'Grid: 100x100 \n')
-string_file.close()
-storageFrame.to_csv(dir_name+'/residuals.txt')
-
 
 #zmin = storageFrame.min().min()
 #zmax = storageFrame.max().max()

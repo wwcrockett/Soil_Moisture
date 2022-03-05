@@ -324,7 +324,7 @@ def phydrus_n(n=2.9,Ks=25,Qs=0.7,Alpha=0.07):
         del y[0:2]
         del x[0:2]
     if dat_len > mod_len:
-        return([dat_len,mod_len])
+        return [0,0]
 
     Log_Theta =0
     for i in range(len(y)):
@@ -350,7 +350,7 @@ Ns = NChain * [0]
 Likelihoods = NChain *[0]
 Ns[0] = n
 Kss = NChain * [0]
-ks = 100
+ks = 50
 Kss[0] = ks
 Chain[0] = [n, ks]                #Input initial parameter values
 
@@ -359,7 +359,7 @@ Sigma_Theta = [0.2,4]           #Parameter Jump sizes/ initial distribution widt
 sigma = [3,1]
 AcceptCnt = 0
 Lower_Bound = [1,1]
-Upper_Bound = [5,200]
+Upper_Bound = [3.8,100]
 
 for n in range(1,(NChain)):
     
@@ -381,16 +381,18 @@ for n in range(1,(NChain)):
     if n == 1:
         LogTheta = phydrus_n(n=Theta[0], Ks=Theta[1])        #For first run, Phydrus must be run for theta and theta test
     LogThetaTest = phydrus_n(n=ThetaTest[0], Ks=ThetaTest[1])    #For all runs, Phydrus must be run for theta test
-        
-    Likelihood_Ratio = np.exp(LogThetaTest-LogTheta)
-    Alpha = min(1,Prior_Ratio * Likelihood_Ratio)
-    Likelihoods[n] = Alpha
-    if Alpha > random.random():
-        Chain[n] = ThetaTest
-        AcceptCnt += 1
-        LogTheta = LogThetaTest
-    else:
+    if len(LogTheta) ==2:
         Chain[n] = Theta
+    else:
+        Likelihood_Ratio = np.exp(LogThetaTest-LogTheta)
+        Alpha = min(1,Prior_Ratio * Likelihood_Ratio)
+        Likelihoods[n] = Alpha
+        if Alpha > random.random():
+            Chain[n] = ThetaTest
+            AcceptCnt += 1
+            LogTheta = LogThetaTest
+        else:
+            Chain[n] = Theta
             
     Recent = tuple(Chain[n])
     Ns[n] = Chain[n][0]

@@ -1,5 +1,6 @@
 *.png
 *.csv
 read/hydrus
-SES_Pydrus/
+SES_Pydrus/*
+Ses_Pydrus/
 save/
