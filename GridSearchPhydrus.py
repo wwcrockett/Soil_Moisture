@@ -327,58 +327,87 @@ def phydrus_calc(n=2.9,Ks=25,Qs=0.7,Alpha=0.07):
     if dat_len > mod_len:
         return
 
-    Log_Theta =[]
+    Log_Likelihood =[]
     for i in range(len(y)):
-        Log_Theta.append(-0.5*np.log(2*np.pi*sigma**2)-(float(data[3][i])-y[i])**2/((2*sigma**2)))
-
-    return(Log_Theta)
+        Log_Likelihood.append(-0.5*np.log(2*np.pi*sigma**2)-(float(data[3][i])-y[i])**2/((2*sigma**2)))
+    Log_Likelihood= sum(Log_Likelihood)
+    return(Log_Likelihood)
 
 # In[ ]:
-
-
-
-before = dt.datetime.now()
-
-NChain = 1
-Ns = np.linspace(1,5,NChain)
-Kss = np.linspace(5,200,NChain)
-Residuals = np.zeros((NChain,NChain))
-storageFrame = pd.DataFrame(columns=Ns,index=Kss)
-date_time = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-dir_name = './save/GridSearch_Run_'+date_time
-os.mkdir(dir_name)
-string_file = open(dir_name+'/sum.txt','w')
-string_file.write('parameters = n, Ks \n'+'Grid: 100x100 \n')
-string_file.close()
-
-for NN in Ns:
-    for KK in Kss: 
-        LogTheta = phydrus_calc(n=NN,Ks=KK)        #For first run, Phydrus must be run for theta and theta test
-        print(NN)
-        print(KK)
-        print(LogTheta)
-        #print(sumdi)
-        storageFrame.loc[KK,NN]=LogTheta
-        storageFrame.to_csv(dir_name+'/residuals.csv')
-
-after = dt.datetime.now()
-
-time = after-before
-print(time)
-RunTime = 'Run Time = %s'%time
-
-#zmin = storageFrame.min().min()
-#zmax = storageFrame.max().max()
-#levels = np.linspace(zmin,zmax,30)
-
-
-fig1, ax = plt.subplots()
-#ticks = np.linspace(zmin, zmax, 8)
-n = storageFrame.columns
-ks = storageFrame.index
-CS = ax.contourf(n,ks,storageFrame)#, levels=levels)
-cbar = fig1.colorbar(CS,label = 'LogTheta Value')
-ax.set_xlabel('n')
-ax.set_ylabel('Ks')
-fig1.tight_layout()
-plt.savefig(dir_name+'/GridSearch.png', bbox_inches='tight')
+'''Inputs:
+    parnames = [name of parameter 1,name of parameter 2]
+    bounds1 = [initial value of par 1,final value of par 1 ]
+    bounds2 = [initial value of par 2, final value of par 2]
+    NChain = Integer number of values of each parameter to be tested*
+        *NOTE: The # of iterations = NChain^2
+'''
+def gridsearch(parnames,bounds1,bounds2,NChain):
+        
+    before = dt.datetime.now()
+    #Define parameter vectors:
+    Par1 = np.linspace(bounds1[0],bounds1[1],NChain)
+    print(Par1)
+    Par2 = np.linspace(bounds2[0],bounds2[1],NChain)
+    print(Par2)
+    #Initialize dataframe:
+    storageFrame = pd.DataFrame(columns=Par1,index=Par2)
+    print(storageFrame)
+    #Initialize save directory and summary .txt file
+    date_time = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    dir_name = './save/GridSearch_Run_'+date_time
+    os.mkdir(dir_name)
+    string_file = open(dir_name+'/sum.txt','w')
+    string_file.write('parameters = '+parnames[0] +', '+parnames[1]+'\n'+'Grid: '+str(NChain)+'x'+str(NChain)+'\n')
+    string_file.close()
+    #Loop through parameter values and return residual (log likelihood)
+    print(storageFrame)
+    for ii in Par1:
+        for jj in Par2: 
+            LogLikelihood = eval('phydrus_calc('+parnames[0]+'='+str(ii) + \
+                                               ','+parnames[1]+'='+str(jj)+')')        #For first run, Phydrus must be run for theta and theta test
+            print(ii)
+            print(jj)
+            print(LogLikelihood)
+            storageFrame.at[jj,ii] = LogLikelihood
+            print(storageFrame)
+    
+    after = dt.datetime.now()
+    storageFrame.to_csv(dir_name+'/residuals.csv')
+    time = after-before
+    print(time)
+    RunTime = 'Run Time = %s'%time
+    string_file = open(dir_name+'/sum.txt','a')
+    string_file.write(RunTime)
+    #zmin = storageFrame.min().min()
+    #zmax = storageFrame.max().max()
+    #levels = np.linspace(zmin,zmax,30)
+    
+    
+    fig1, ax = plt.subplots()
+    #ticks = np.linspace(zmin, zmax, 8)
+    n = storageFrame.columns
+    ks = storageFrame.index
+    CS = ax.contourf(n,ks,storageFrame)#, levels=levels)
+    cbar = fig1.colorbar(CS,label = 'LogTheta Value')
+    ax.set_xlabel(parnames[0])
+    ax.set_ylabel(parnames[1])
+    fig1.tight_layout()
+    plt.savefig(dir_name+'/GridSearch.png', bbox_inches='tight')
+    
+    
+#%%
+nBounds = [1,5]
+KsBounds = [1,200]
+AlphaBounds = [0,0.2]
+QsBounds = [0,1]
+QrBounds = [0,0.25]    
+gridsearch(['n','Qs'],nBounds,QsBounds,100)
+gridsearch(['n','Ks'],nBounds,KsBounds,100)
+gridsearch(['n','Alpha'],nBounds,AlphaBounds,100)
+gridsearch(['n','Qr'],nBounds,QrBounds,100)
+gridsearch(['Ks','Alpha'],KsBounds,AlphaBounds,100)
+gridsearch(['Ks','Qs'],KsBounds,QsBounds,100)
+gridsearch(['Ks','Qr'],KsBounds,QrBounds,100)
+gridsearch(['Qs','Alpha'],QsBounds,AlphaBounds,100)
+gridsearch(['Qs','Qr'],QsBounds,QrBounds,100)
+gridsearch(['Qr','Alpha'],QrBounds,AlphaBounds,100)

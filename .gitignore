@@ -2,5 +2,5 @@
 *.csv
 read/hydrus
 SES_Pydrus/*
-Ses_Pydrus/
+SES_Pydrus/
 save/
